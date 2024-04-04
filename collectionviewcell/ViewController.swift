@@ -63,7 +63,6 @@ class CellViewController: UIViewController {
 extension CellViewController: UICollectionViewDataSource {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        // Limit cell count to 50
         return 50
     }
 
@@ -71,7 +70,7 @@ extension CellViewController: UICollectionViewDataSource {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "Cell", for: indexPath)
 
         let contentView = cell.contentView
-        contentView.subviews.forEach { $0.removeFromSuperview() } // Remove any existing subviews
+        contentView.subviews.forEach { $0.removeFromSuperview() }
 
         if indexPath.row == 0 {
             configurePlusButton(for: contentView)
