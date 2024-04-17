@@ -8,52 +8,67 @@
 import UIKit
 import AVFoundation
 
-class CellViewController: UIViewController {
+final class CellViewController: UIViewController {
 
     // MARK: - Properties
 
-    private var collectionView: UICollectionView?
     private var photos: [UIImage?] = []
     
-    // MARK: - View Lifecycle
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        setupCollectionView()
-        
-        let cameraAccessGranted = UserDefaults.standard.bool(forKey: "CameraAccessGranted")
-        if cameraAccessGranted {
-            AVCaptureDevice.requestAccess(for: .video) { granted in
-                if granted {
-                    UserDefaults.standard.set(true, forKey: "CameraAccessGranted")
-                }
-            }
-        }
-    }
-
-    // MARK: - Setup
-
-    private func setupCollectionView() {
+    // MARK: - Lazy Properties
+    
+    private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.minimumLineSpacing = 10
         layout.minimumInteritemSpacing = 10
         layout.itemSize = CGSize(width: (view.frame.size.width - 30) / 2, height: (view.frame.size.width - 30) / 2)
 
-        collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView?.translatesAutoresizingMaskIntoConstraints = false
-        collectionView?.backgroundColor = .systemBackground
-        collectionView?.dataSource = self
-        collectionView?.delegate = self
-        collectionView?.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "Cell")
-        if let collectionView = collectionView {
-            view.addSubview(collectionView)
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        collectionView.backgroundColor = .systemBackground
+        collectionView.dataSource = self
+        collectionView.delegate = self
+        collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "Cell")
+        return collectionView
+    }()
 
-            NSLayoutConstraint.activate([
-                collectionView.topAnchor.constraint(equalTo: view.topAnchor),
-                collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-                collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-                collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-            ])
+    // MARK: - View Lifecycle
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupCollectionView()
+        checkCameraAccess()
+    }
+
+    // MARK: - Setup
+
+    private func setupCollectionView() {
+        view.addSubview(collectionView)
+
+        NSLayoutConstraint.activate([
+            collectionView.topAnchor.constraint(equalTo: view.topAnchor),
+            collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+    }
+    
+    // MARK: - Camera Access
+    
+    func checkCameraAccess() {
+        let cameraAccessGranted = UserDefaults.standard.bool(forKey: "CameraAccessGranted")
+        if !cameraAccessGranted {
+            AVCaptureDevice.requestAccess(for: .video) { granted in
+                UserDefaults.standard.set(granted, forKey: "CameraAccessGranted")
+                if granted {
+                    DispatchQueue.main.async {
+                        self.showCamera()
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        self.showCameraAccessDeniedAlert()
+                    }
+                }
+            }
         }
     }
 }
@@ -63,6 +78,7 @@ class CellViewController: UIViewController {
 extension CellViewController: UICollectionViewDataSource {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        // Limit cell count to 50
         return 50
     }
 
@@ -74,7 +90,7 @@ extension CellViewController: UICollectionViewDataSource {
 
         if indexPath.row == 0 {
             configurePlusButton(for: contentView)
-        } else if photos.indices.contains(indexPath.row - 1), let image = photos[indexPath.row - 1] {
+        } else if let image = photos[indexPath.row] {
             configureImage(for: contentView, with: image)
         } else {
             cell.backgroundColor = .clear
@@ -109,8 +125,8 @@ extension CellViewController: UICollectionViewDataSource {
             self.showCamera()
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
+                UserDefaults.standard.set(granted, forKey: "CameraAccessGranted")
                 if granted {
-                    UserDefaults.standard.set(true, forKey: "CameraAccessGranted")
                     DispatchQueue.main.async {
                         self.showCamera()
                     }
@@ -144,15 +160,26 @@ extension CellViewController: UICollectionViewDelegate {
 extension CellViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
 
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-        if let image = info[.originalImage] as? UIImage {
-            if let index = photos.firstIndex(where: { $0 == nil }) {
-                photos[index] = image
-            } else if photos.count < 50 {
-                photos.append(image)
-            }
-            collectionView?.reloadData()
-        }
         picker.dismiss(animated: true, completion: nil)
+        
+        guard let image = info[.originalImage] as? UIImage else { return }
+        
+        var nearestEmptyIndex: Int?
+        for index in 1..<photos.count {
+            if photos[index] == nil {
+                nearestEmptyIndex = index
+                break
+            }
+        }
+        if let nearestIndex = nearestEmptyIndex {
+            if nearestIndex < photos.count {
+                photos[nearestIndex] = image
+                collectionView.reloadItems(at: [IndexPath(item: nearestIndex, section: 0)])
+            } else {
+                photos.append(image)
+                collectionView.reloadData()
+            }
+        }
     }
 
     private func showCamera() {
