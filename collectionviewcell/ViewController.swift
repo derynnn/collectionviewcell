@@ -86,7 +86,7 @@ extension CellViewController: UICollectionViewDataSource {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "Cell", for: indexPath)
 
         let contentView = cell.contentView
-        contentView.subviews.forEach { $0.removeFromSuperview() } // Remove any existing subviews
+        contentView.subviews.forEach { $0.removeFromSuperview() }
 
         if indexPath.row == 0 {
             configurePlusButton(for: contentView)
@@ -164,7 +164,6 @@ extension CellViewController: UIImagePickerControllerDelegate, UINavigationContr
         
         guard let image = info[.originalImage] as? UIImage else { return }
         
-        // Find the nearest empty cell starting from the index of the plus button cell
         var nearestEmptyIndex: Int?
         for index in 1..<photos.count {
             if photos[index] == nil {
@@ -172,14 +171,11 @@ extension CellViewController: UIImagePickerControllerDelegate, UINavigationContr
                 break
             }
         }
-        
-        // If there is an empty cell found, assign the image to that cell
         if let nearestIndex = nearestEmptyIndex {
             if nearestIndex < photos.count {
                 photos[nearestIndex] = image
                 collectionView.reloadItems(at: [IndexPath(item: nearestIndex, section: 0)])
             } else {
-                // If nearestIndex is out of range, append the image to the photos array
                 photos.append(image)
                 collectionView.reloadData()
             }
